@@ -12,7 +12,7 @@ pipeline {
         NEXUS_CREDENTIAL_ID = "nexus_keygen"
 
         // Tomcat deployment settings
-        TOMCAT_URL = "http://13.221.159.29:8081/manager/text/deploy?path=/SimpleCustomerApp&update=true"
+        TOMCAT_URL = "http://13.221.159.29:8081/manager/html/deploy?path=/SimpleCustomerApp&update=true"
         TOMCAT_CREDENTIAL_ID = "tomcat"
     }
     stages {
@@ -73,7 +73,7 @@ pipeline {
 
                     withCredentials([usernamePassword(credentialsId: 'tomcat', usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASS')]) {
                         sh """
-                            curl -u $TOMCAT_USER:$TOMCAT_PASS -T '${warFile}' "http://13.221.159.29:8081/manager/text/deploy?path=/SimpleCustomerApp&update=true"
+                            curl -u $TOMCAT_USER:$TOMCAT_PASS -T '${warFile}' "http://13.221.159.29:8081/manager/html/deploy?path=/SimpleCustomerApp&update=true"
                         """
                     }
                 }
