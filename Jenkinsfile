@@ -62,17 +62,21 @@ pipeline {
             }
         }
 
-        stage("deploy to tomcat") {
+              stage("deploy to tomcat") {
             steps {
                 script {
-                    def warFile = "target/SimpleCustomerApp.war"
-                    withCredentials([usernamePassword(credentialsId: TOMCAT_CREDENTIAL_ID, usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASS')]) {
-                        sh """
-                            curl -u $TOMCAT_USER:$TOMCAT_PASS -T ${warFile} "${TOMCAT_URL}"
-                        """
+                    def warFiles = findFiles(glob: 'target/*.war')
+                    if (warFiles.length == 0) {
+                        error "No WAR file found in target directory"
+                    }
+                    def warFile = warFiles[0].path
+
+                    withCredentials([usernamePassword(credentialsId: 'tomcat', usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASS')]) {
+                        sh '''
+                            curl -u $TOMCAT_USER:$TOMCAT_PASS -T '${warFile}' "http://13.221.159.29:8081/manager/text/deploy?path=/SimpleCustomerApp&update=true"
+                        '''
                     }
                 }
             }
         }
     }
-}
