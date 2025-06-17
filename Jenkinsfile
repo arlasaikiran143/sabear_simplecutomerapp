@@ -72,9 +72,9 @@ pipeline {
                     def warFile = warFiles[0].path
 
                     withCredentials([usernamePassword(credentialsId: 'tomcat', usernameVariable: 'TOMCAT_USER', passwordVariable: 'TOMCAT_PASS')]) {
-                        sh '''
+                        sh """
                             curl -u $TOMCAT_USER:$TOMCAT_PASS -T '${warFile}' "http://13.221.159.29:8081/manager/text/deploy?path=/SimpleCustomerApp&update=true"
-                        '''
+                        """
                     }
                 }
             }
