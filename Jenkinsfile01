@@ -1,0 +1,77 @@
+node {
+    def NEXUS_VERSION = "nexus3"
+    def NEXUS_PROTOCOL = "http"
+    def NEXUS_URL = http://3.95.29.162:8081/
+    def NEXUS_REPOSITORY = "maven-snapshot05"
+    def NEXUS_CREDENTIAL_ID = "Nexus_server"
+    def SCANNER_HOME = tool name: 'sonar_scanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+    def mvnHome = tool name: 'Maven_3.9.4', type: 'hudson.tasks.Maven$MavenInstallation'
+    try {
+        stage('Clone Code') {
+            git 'https://github.com/Sushmitha1-16/sabear_simplecutomerapp.git'
+        }
+        stage('Maven Build') {
+            sh "${mvnHome}/bin/mvn -Dmaven.test.failure.ignore=true clean install"
+        }
+        stage('SonarCloud') {
+            withSonarQubeEnv('sonar') {
+                sh """
+                    ${SCANNER_HOME}/bin/sonar-scanner \
+                    -Dsonar.projectKey=Ncodeit \
+                    -Dsonar.projectName=Ncodeit \
+                    -Dsonar.projectVersion=2.0 \
+                    -Dsonar.sources=/var/lib/jenkins/workspace/$JOB_NAME/src/ \
+                    -Dsonar.binaries=target/classes/com/visualpathit/account/controller/ \
+                    -Dsonar.junit.reportsPath=target/surefire-reports \
+                    -Dsonar.jacoco.reportPath=target/jacoco.exec \
+                    -Dsonar.java.binaries=src/com/room/sample
+                """
+            }
+        }
+        stage('Publish to Nexus') {
+            def pom = readMavenPom file: 'pom.xml'
+            echo "Version: ${pom.version}"
+            def filesByGlob = findFiles(glob: "target/*.${pom.packaging}")
+            echo "${filesByGlob[0].name} ${filesByGlob[0].path} ${filesByGlob[0].directory} ${filesByGlob[0].length} ${filesByGlob[0].lastModified}"
+            def artifactPath = filesByGlob[0].path
+            def artifactExists = fileExists artifactPath
+            if (artifactExists) {
+                echo "*** File: ${artifactPath}, group: ${pom.groupId}, packaging: ${pom.packaging}, version: ${pom.version}"
+                nexusArtifactUploader(
+                    nexusVersion: NEXUS_VERSION,
+                    protocol: NEXUS_PROTOCOL,
+                    nexusUrl: NEXUS_URL,
+                    groupId: pom.groupId,
+                    version: pom.version,
+                    repository: NEXUS_REPOSITORY,
+                    credentialsId: NEXUS_CREDENTIAL_ID,
+                    artifacts: [
+                        [artifactId: pom.artifactId, classifier: '', file: artifactPath, type: pom.packaging],
+                        [artifactId: pom.artifactId, classifier: '', file: "pom.xml", type: "pom"]
+                    ]
+                )
+            } else {
+                error "*** File: ${artifactPath}, could not be found"
+            }
+        }
+        stage('Deploy to Tomcat') {
+            def pom = readMavenPom file: 'pom.xml'
+            def artifactPath = "target/*.${pom.packaging}"
+            def tomcatUrl = http://13.221.159.29:8081/
+            def contextPath = "/${pom.artifactId}"
+            deploy adapters: [tomcat9(credentialsId: 'tomcat-token', url: tomcatUrl)],
+                   contextPath: contextPath,
+                   war: artifactPath
+        }
+        slackSend(channel: '#jenkins-integration',
+                  color: 'good',
+                  message: "Build #${env.BUILD_NUMBER} of ${env.JOB_NAME} succeeded! Deployed to Tomcat at ${env.BUILD_URL}",
+                  tokenCredentialId: 'slack_token')
+    } catch (Exception e) {
+        slackSend(channel: '#jenkins-integration',
+                  color: 'danger',
+                  message: "Build #${env.BUILD_NUMBER} of ${env.JOB_NAME} failed: ${e.getMessage()} at ${env.BUILD_URL}",
+                  tokenCredentialId: 'slack_token')
+        throw e
+    }
+}
